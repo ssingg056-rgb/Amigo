@@ -38,8 +38,8 @@ class QuoteCog(commands.Cog):
 
         # Load fonts safely
         try:
-            quote_font = ImageFont.truetype("arialbd.ttf", 36)
-            author_font = ImageFont.truetype("arial.ttf", 22)
+            quote_font = ImageFont.truetype("BOD_B.TTF", 36)
+            author_font = ImageFont.truetype("BOD_R.TTF", 22)
         except IOError:
             quote_font = ImageFont.load_default()
             author_font = ImageFont.load_default()
