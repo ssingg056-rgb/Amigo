@@ -10,6 +10,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
 intents.members = True  # Required to detect when members join
+intents.message_content = True  # Required to read commands like .quo
 
 bot = commands.Bot(command_prefix=".", intents=intents)
 
