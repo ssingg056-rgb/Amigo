@@ -12,33 +12,32 @@ class QuoteCog(commands.Cog):
     async def quo_command(self, ctx, *, text: str = None):
         target_message = None
         
-        # Check if replying to a message
         if ctx.message.reference and ctx.message.reference.resolved:
             target_message = ctx.message.reference.resolved
         
         if target_message:
             display_name = target_message.author.display_name
             username = str(target_message.author.name)
-            avatar_url = target_message.author.avatar.url if target_message.author.avatar else target_message.author.default_avatar.url
             
-            # Use message content if available
-            if not text:
-                text = target_message.content
+            # Default to author's avatar URL if no image attachment is found
+            image_url = target_message.author.avatar.url if target_message.author.avatar else target_message.author.default_avatar.url
             
             # Check if the target message has an image attachment
             if target_message.attachments:
                 attachment = target_message.attachments[0]
                 if attachment.content_type and "image" in attachment.content_type:
-                    # If the message is just an image with no text, provide a default caption or use the author's name
+                    image_url = attachment.url
                     if not text:
-                        text = f"Image by {display_name}"
+                        text = target_message.content or "Aesthetic"
+            
+            if not text:
+                text = target_message.content
         else:
-            # Fallback if command is run directly without a reply
             display_name = ctx.author.display_name
             username = str(ctx.author.name)
-            avatar_url = ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url
+            image_url = ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url
             if not text:
-                await ctx.send("Please provide some text or reply to a message with `.quo`!")
+                await ctx.send("Please provide some text or reply to a message/image with `.quo`!")
                 return
 
         # Canvas configuration (1000x500)
@@ -61,30 +60,30 @@ class QuoteCog(commands.Cog):
             quote_font = ImageFont.load_default()
             author_font = ImageFont.load_default()
 
-        # Process circular avatar with a soft drop shadow
-        avatar_size = 280
+        # Process the target image (avatar or attachment) into a circular card with a shadow
+        image_size = 280
         async with aiohttp.ClientSession() as session:
-            async with session.get(str(avatar_url)) as resp:
+            async with session.get(str(image_url)) as resp:
                 if resp.status == 200:
-                    avatar_bytes = await resp.read()
-                    avatar_image = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
-                    avatar_image = avatar_image.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
+                    img_bytes = await resp.read()
+                    card_image = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+                    card_image = card_image.resize((image_size, image_size), Image.Resampling.LANCZOS)
                     
                     # Circular mask
-                    mask = Image.new("L", (avatar_size, avatar_size), 0)
+                    mask = Image.new("L", (image_size, image_size), 0)
                     mask_draw = ImageDraw.Draw(mask)
-                    mask_draw.ellipse((0, 0, avatar_size, avatar_size), fill=255)
+                    mask_draw.ellipse((0, 0, image_size, image_size), fill=255)
                     
                     # Drop shadow layer
                     shadow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
                     shadow_draw = ImageDraw.Draw(shadow)
                     shadow_x, shadow_y = 80, 110
-                    shadow_draw.ellipse((shadow_x + 8, shadow_y + 12, shadow_x + avatar_size + 8, shadow_y + avatar_size + 12), fill=(0, 0, 0, 90))
+                    shadow_draw.ellipse((shadow_x + 8, shadow_y + 12, shadow_x + image_size + 8, shadow_y + image_size + 12), fill=(0, 0, 0, 90))
                     shadow = shadow.filter(ImageFilter.GaussianBlur(12))
                     base.paste(shadow, (0, 0), shadow)
 
-                    # Paste avatar
-                    base.paste(avatar_image, (shadow_x, shadow_y), mask)
+                    # Paste image
+                    base.paste(card_image, (shadow_x, shadow_y), mask)
 
         # Intelligent text wrapping for the right side block
         max_text_width = 480
