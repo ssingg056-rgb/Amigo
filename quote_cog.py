@@ -70,7 +70,7 @@ class QuoteCog(commands.Cog):
                     base.paste(avatar_image, (shadow_x, shadow_y), mask)
 
         # Intelligent text wrapping for the right side block
-        max_text_width = 500
+        max_text_width = 480
         words = text.split()
         lines = []
         current_line = ""
@@ -87,7 +87,7 @@ class QuoteCog(commands.Cog):
         if current_line:
             lines.append(current_line)
 
-        # Add smart quotation marks around the full text block
+        # Add smart quotation marks
         formatted_lines = []
         for i, line in enumerate(lines):
             if i == 0:
@@ -96,24 +96,33 @@ class QuoteCog(commands.Cog):
                 line = f'{line}”'
             formatted_lines.append(line)
 
-        # Vertical alignment calculations
+        # Vertical and horizontal alignment calculations for the right side
         line_height = 46
         total_text_height = len(formatted_lines) * line_height
         author_text = f"— {display_name} (@{username})"
+        
+        author_bbox = draw.textbbox((0, 0), author_text, font=author_font)
+        author_width = author_bbox[2] - author_bbox[0]
+
         total_block_height = total_text_height + 25 + 25
-
         start_y = (height - total_block_height) / 2 - 15
-        text_x = 400
+        
+        right_section_center = 700
 
-        # Draw quote text lines
+        # Draw quote text lines centered individually
         current_y = start_y
         for line in formatted_lines:
-            draw.text((text_x, current_y), line, fill=(35, 35, 35, 255), font=quote_font)
+            bbox = draw.textbbox((0, 0), line, font=quote_font)
+            line_width = bbox[2] - bbox[0]
+            line_x = right_section_center - (line_width / 2)
+            
+            draw.text((line_x, current_y), line, fill=(35, 35, 35, 255), font=quote_font)
             current_y += line_height
 
-        # Draw author info underneath
+        # Draw author info centered underneath
         current_y += 10
-        draw.text((text_x, current_y), author_text, fill=(75, 75, 75, 255), font=author_font)
+        author_x = right_section_center - (author_width / 2)
+        draw.text((author_x, current_y), author_text, fill=(75, 75, 75, 255), font=author_font)
 
         # Save and send output image
         buffer = io.BytesIO()
