@@ -1,7 +1,7 @@
 import io
 import discord
 from discord.ext import commands
-from PIL import Image, ImageDraw, ImageFont
+from PIL import Image, ImageDraw, ImageFont, ImageFilter
 import aiohttp
 
 class QuoteCog(commands.Cog):
@@ -24,45 +24,98 @@ class QuoteCog(commands.Cog):
             await ctx.send("Please provide some text or reply to a message with `.quo`!")
             return
 
-        # Sleek dark aesthetic background (900x450 pixels)
-        base = Image.new("RGBA", (900, 450), color=(18, 18, 22, 255))
+        # Canvas configuration (1000x500)
+        width, height = 1000, 500
+        base = Image.new("RGBA", (width, height))
         draw = ImageDraw.Draw(base)
 
-        # Download and crop avatar into a smooth circle
+        # Smooth horizontal gray gradient background
+        for x in range(width):
+            r = int(150 + (205 - 150) * (x / width))
+            g = int(150 + (205 - 150) * (x / width))
+            b = int(150 + (205 - 150) * (x / width))
+            draw.line([(x, 0), (x, height)], fill=(r, g, b, 255))
+
+        # Load fonts safely
+        try:
+            quote_font = ImageFont.truetype("arialbd.ttf", 36)
+            author_font = ImageFont.truetype("arial.ttf", 22)
+        except IOError:
+            quote_font = ImageFont.load_default()
+            author_font = ImageFont.load_default()
+
+        # Process circular avatar with a soft drop shadow
+        avatar_size = 280
         async with aiohttp.ClientSession() as session:
             async with session.get(str(avatar_url)) as resp:
                 if resp.status == 200:
                     avatar_bytes = await resp.read()
                     avatar_image = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
-                    avatar_image = avatar_image.resize((100, 100), Image.Resampling.LANCZOS)
+                    avatar_image = avatar_image.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
                     
-                    # Create circular mask
-                    mask = Image.new("L", (100, 100), 0)
+                    # Circular mask
+                    mask = Image.new("L", (avatar_size, avatar_size), 0)
                     mask_draw = ImageDraw.Draw(mask)
-                    mask_draw.ellipse((0, 0, 100, 100), fill=255)
+                    mask_draw.ellipse((0, 0, avatar_size, avatar_size), fill=255)
                     
-                    # Paste circular avatar onto the card
-                    base.paste(avatar_image, (60, 60), mask)
+                    # Drop shadow layer
+                    shadow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+                    shadow_draw = ImageDraw.Draw(shadow)
+                    shadow_x, shadow_y = 80, 110
+                    shadow_draw.ellipse((shadow_x + 8, shadow_y + 12, shadow_x + avatar_size + 8, shadow_y + avatar_size + 12), fill=(0, 0, 0, 90))
+                    shadow = shadow.filter(ImageFilter.GaussianBlur(12))
+                    base.paste(shadow, (0, 0), shadow)
 
-        # Load fonts safely (using your bundled ttf files)
-        try:
-            quote_font = ImageFont.truetype("arial.ttf", 32)
-            name_font = ImageFont.truetype("arialbd.ttf", 22)
-            handle_font = ImageFont.truetype("arial.ttf", 16)
-        except IOError:
-            quote_font = ImageFont.load_default()
-            name_font = ImageFont.load_default()
-            handle_font = ImageFont.load_default()
+                    # Paste avatar
+                    base.paste(avatar_image, (shadow_x, shadow_y), mask)
 
-        # Draw display name and username next to the avatar
-        draw.text((180, 75), display_name, fill="white", font=name_font)
-        draw.text((180, 105), f"@{username}", fill=(140, 140, 150, 255), font=handle_font)
+        # Intelligent text wrapping for the right side block
+        max_text_width = 500
+        words = text.split()
+        lines = []
+        current_line = ""
 
-        # Draw aesthetic quote text below
-        draw.text((60, 195), "“", fill=(220, 220, 220, 255), font=quote_font)
-        draw.text((95, 200), text, fill="white", font=quote_font)
+        for word in words:
+            test_line = f"{current_line} {word}".strip()
+            bbox = draw.textbbox((0, 0), test_line, font=quote_font)
+            w = bbox[2] - bbox[0]
+            if w <= max_text_width:
+                current_line = test_line
+            else:
+                lines.append(current_line)
+                current_line = word
+        if current_line:
+            lines.append(current_line)
 
-        # Save and send
+        # Add smart quotation marks around the full text block
+        formatted_lines = []
+        for i, line in enumerate(lines):
+            if i == 0:
+                line = f'“{line}'
+            if i == len(lines) - 1:
+                line = f'{line}”'
+            formatted_lines.append(line)
+
+        # Vertical alignment calculations
+        line_height = 46
+        total_text_height = len(formatted_lines) * line_height
+        author_text = f"— {display_name} (@{username})"
+        total_block_height = total_text_height + 25 + 25
+
+        start_y = (height - total_block_height) / 2 - 15
+        text_x = 400
+
+        # Draw quote text lines
+        current_y = start_y
+        for line in formatted_lines:
+            draw.text((text_x, current_y), line, fill=(35, 35, 35, 255), font=quote_font)
+            current_y += line_height
+
+        # Draw author info underneath
+        current_y += 10
+        draw.text((text_x, current_y), author_text, fill=(75, 75, 75, 255), font=author_font)
+
+        # Save and send output image
         buffer = io.BytesIO()
         base.save(buffer, format="PNG")
         buffer.seek(0)
