@@ -15,26 +15,26 @@ class QuoteCog(commands.Cog):
         if ctx.message.reference and ctx.message.reference.resolved:
             target_message = ctx.message.reference.resolved
         
+        # Default values
+        display_name = ctx.author.display_name
+        username = str(ctx.author.name)
+        avatar_url = ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url
+        attached_image_url = None
+
         if target_message:
             display_name = target_message.author.display_name
             username = str(target_message.author.name)
-            
-            # Keep author's actual avatar for the circle
-            image_url = target_message.author.avatar.url if target_message.author.avatar else target_message.author.default_avatar.url
+            avatar_url = target_message.author.avatar.url if target_message.author.avatar else target_message.author.default_avatar.url
             
             if not text:
                 text = target_message.content
                 
-            # If they replied to an image and didn't provide text, leave text empty instead of fallback words
-            if not text and target_message.attachments:
-                text = "" 
-        else:
-            display_name = ctx.author.display_name
-            username = str(ctx.author.name)
-            image_url = ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url
-            if not text:
-                await ctx.send("Please provide some text or reply to a message with `.quo`!")
-                return
+            # Check for image attachment in the quoted message
+            if target_message.attachments:
+                for attachment in target_message.attachments:
+                    if attachment.content_type and "image" in attachment.content_type:
+                        attached_image_url = attachment.url
+                        break
 
         # Canvas configuration (1000x500)
         width, height = 1000, 500
@@ -56,38 +56,62 @@ class QuoteCog(commands.Cog):
             quote_font = ImageFont.load_default()
             author_font = ImageFont.load_default()
 
-        # Process circular avatar with a soft drop shadow
-        image_size = 280
+        # 1. Process author's avatar into the left circle with a drop shadow
+        avatar_size = 280
         async with aiohttp.ClientSession() as session:
-            async with session.get(str(image_url)) as resp:
+            async with session.get(str(avatar_url)) as resp:
                 if resp.status == 200:
-                    img_bytes = await resp.read()
-                    card_image = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
-                    card_image = card_image.resize((image_size, image_size), Image.Resampling.LANCZOS)
+                    avatar_bytes = await resp.read()
+                    avatar_img = Image.open(io.BytesIO(avatar_bytes)).convert("RGBA")
+                    avatar_img = avatar_img.resize((avatar_size, avatar_size), Image.Resampling.LANCZOS)
                     
-                    # Circular mask
-                    mask = Image.new("L", (image_size, image_size), 0)
+                    mask = Image.new("L", (avatar_size, avatar_size), 0)
                     mask_draw = ImageDraw.Draw(mask)
-                    mask_draw.ellipse((0, 0, image_size, image_size), fill=255)
+                    mask_draw.ellipse((0, 0, avatar_size, avatar_size), fill=255)
                     
-                    # Drop shadow layer
                     shadow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
                     shadow_draw = ImageDraw.Draw(shadow)
                     shadow_x, shadow_y = 80, 110
-                    shadow_draw.ellipse((shadow_x + 8, shadow_y + 12, shadow_x + image_size + 8, shadow_y + image_size + 12), fill=(0, 0, 0, 90))
+                    shadow_draw.ellipse((shadow_x + 8, shadow_y + 12, shadow_x + avatar_size + 8, shadow_y + avatar_size + 12), fill=(0, 0, 0, 90))
                     shadow = shadow.filter(ImageFilter.GaussianBlur(12))
                     base.paste(shadow, (0, 0), shadow)
-
-                    # Paste avatar
-                    base.paste(card_image, (shadow_x, shadow_y), mask)
+                    base.paste(avatar_img, (shadow_x, shadow_y), mask)
 
         author_text = f"— {display_name} (@{username})"
         author_bbox = draw.textbbox((0, 0), author_text, font=author_font)
         author_width = author_bbox[2] - author_bbox[0]
         right_section_center = 700
 
-        # Only process and draw text if there is actually text content
-        if text:
+        # 2. Handle Right Side Content (Image Attachment vs Text)
+        if attached_image_url:
+            # Download and paste the quoted image on the right side
+            async with aiohttp.ClientSession() as session:
+                async with session.get(str(attached_image_url)) as resp:
+                    if resp.status == 200:
+                        img_bytes = await resp.read()
+                        quoted_img = Image.open(io.BytesIO(img_bytes)).convert("RGBA")
+                        
+                        # Resize to fit nicely on the right side (max width 420, max height 280)
+                        quoted_img.thumbnail((420, 280), Image.Resampling.LANCZOS)
+                        qi_width, qi_height = quoted_img.size
+                        
+                        qi_x = right_section_center - (qi_width / 2)
+                        qi_y = (height - qi_height - 40) / 2 - 10
+                        
+                        # Optional subtle shadow for the quoted image
+                        img_shadow = Image.new("RGBA", (width, height), (0, 0, 0, 0))
+                        img_shadow_draw = ImageDraw.Draw(img_shadow)
+                        img_shadow_draw.rectangle((qi_x + 4, qi_y + 6, qi_x + qi_width + 4, qi_y + qi_height + 6), fill=(0, 0, 0, 70))
+                        img_shadow = img_shadow.filter(ImageFilter.GaussianBlur(8))
+                        base.paste(img_shadow, (0, 0), img_shadow)
+                        
+                        base.paste(quoted_img, (int(qi_x), int(qi_y)), quoted_img)
+                        
+                        # Place author text below the quoted image
+                        author_x = right_section_center - (author_width / 2)
+                        draw.text((author_x, qi_y + qi_height + 15), author_text, fill=(75, 75, 75, 255), font=author_font)
+        elif text:
+            # Standard text quote wrapping and rendering
             max_text_width = 480
             words = text.split()
             lines = []
@@ -105,7 +129,6 @@ class QuoteCog(commands.Cog):
             if current_line:
                 lines.append(current_line)
 
-            # Add smart quotation marks
             formatted_lines = []
             for i, line in enumerate(lines):
                 if i == 0:
@@ -132,7 +155,6 @@ class QuoteCog(commands.Cog):
             author_x = right_section_center - (author_width / 2)
             draw.text((author_x, current_y), author_text, fill=(75, 75, 75, 255), font=author_font)
         else:
-            # If no text (e.g. just an image), center the author name nicely on the right
             author_x = right_section_center - (author_width / 2)
             draw.text((author_x, height / 2 - 10), author_text, fill=(75, 75, 75, 255), font=author_font)
 
