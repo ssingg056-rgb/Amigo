@@ -10,19 +10,36 @@ class QuoteCog(commands.Cog):
 
     @commands.command(name="quo")
     async def quo_command(self, ctx, *, text: str = None):
-        if not text and ctx.message.reference and ctx.message.reference.resolved:
-            ref_msg = ctx.message.reference.resolved
-            text = ref_msg.content
-            display_name = ref_msg.author.display_name
-            username = str(ref_msg.author.name)
-            avatar_url = ref_msg.author.avatar.url if ref_msg.author.avatar else ref_msg.author.default_avatar.url
-        elif text:
+        target_message = None
+        
+        # Check if replying to a message
+        if ctx.message.reference and ctx.message.reference.resolved:
+            target_message = ctx.message.reference.resolved
+        
+        if target_message:
+            display_name = target_message.author.display_name
+            username = str(target_message.author.name)
+            avatar_url = target_message.author.avatar.url if target_message.author.avatar else target_message.author.default_avatar.url
+            
+            # Use message content if available
+            if not text:
+                text = target_message.content
+            
+            # Check if the target message has an image attachment
+            if target_message.attachments:
+                attachment = target_message.attachments[0]
+                if attachment.content_type and "image" in attachment.content_type:
+                    # If the message is just an image with no text, provide a default caption or use the author's name
+                    if not text:
+                        text = f"Image by {display_name}"
+        else:
+            # Fallback if command is run directly without a reply
             display_name = ctx.author.display_name
             username = str(ctx.author.name)
             avatar_url = ctx.author.avatar.url if ctx.author.avatar else ctx.author.default_avatar.url
-        else:
-            await ctx.send("Please provide some text or reply to a message with `.quo`!")
-            return
+            if not text:
+                await ctx.send("Please provide some text or reply to a message with `.quo`!")
+                return
 
         # Canvas configuration (1000x500)
         width, height = 1000, 500
