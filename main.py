@@ -32,6 +32,7 @@ def keep_alive():
 async def on_ready():
     print(f"Logged in as {bot.user.name}!")
     await bot.load_extension("welcome_cog")
+    await bot.load_extension("quote_cog")
 
 if __name__ == "__main__":
     keep_alive()
