@@ -5,7 +5,7 @@ class AnnouncementCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
 
-    @commands.command(name="broadcast", aliases=["broadcast"])
+    @commands.command(name="broadcast")
     async def broadcast(self, ctx, channel: discord.TextChannel, *, message: str):
         """Sends a message to a specific server channel. Only the bot creator can use this."""
         
