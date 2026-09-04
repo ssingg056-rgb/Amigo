@@ -7,10 +7,10 @@ class AnnouncementCog(commands.Cog):
 
     @commands.command(name="broadcast")
     async def broadcast(self, ctx, channel: discord.TextChannel, *, message: str):
-        """Sends a message to a specific server channel. Only the bot creator can use this."""
+        """Sends a message to a specific server channel using its ID. Only the bot creator can use this."""
         
         # Replace with your actual numeric Discord user ID
-        CREATOR_ID = 1521196096465010719 
+        CREATOR_ID = YOUR_DISCORD_USER_ID 
         
         if ctx.author.id != CREATOR_ID:
             await ctx.send("You do not have permission to use this command.", delete_after=5)
