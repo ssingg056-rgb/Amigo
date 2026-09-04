@@ -13,8 +13,9 @@ class LevelingCog(commands.Cog):
         self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
-                xp INTEGER,
-                level INTEGER
+                xp INTEGER DEFAULT 0,
+                level INTEGER DEFAULT 1,
+                balance INTEGER DEFAULT 0
             )
         ''')
         self.conn.commit()
@@ -24,31 +25,35 @@ class LevelingCog(commands.Cog):
         if message.author.bot:
             return
 
-        MAX_LEVEL = 100  # Set your maximum level cap here
-
+        MAX_LEVEL = 100 
         user_id = message.author.id
-        self.cursor.execute('SELECT xp, level FROM users WHERE user_id = ?', (user_id,))
+
+        self.cursor.execute('SELECT xp, level, balance FROM users WHERE user_id = ?', (user_id,))
         result = self.cursor.fetchone()
 
         if result is None:
-            self.cursor.execute('INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)', (user_id, 10, 1))
-            self.conn.commit()
+            # First time user: start with 10 xp, level 1, and 50 starting coins/money
+            xp, level, balance = 10, 1, 50
+            self.cursor.execute('INSERT INTO users (user_id, xp, level, balance) VALUES (?, ?, ?, ?)', (user_id, xp, level, balance))
         else:
-            xp, level = result
+            xp, level, balance = result
 
-            # Stop giving XP if the user has reached the cap
-            if level >= MAX_LEVEL:
-                return
+            if level < MAX_LEVEL:
+                xp += 10
+                balance += 5  # Gives 5 coins every time they chat
 
-            xp += 10
-            
-            if xp >= 100 * level:
-                level += 1
-                xp = 0
-                await message.channel.send(f'GG {message.author.mention}, you leveled up to level {level}!')
+                # Level up check
+                if xp >= 100 * level:
+                    level += 1
+                    xp = 0
+                    balance += 100  # Bonus coins on level up!
+                    await message.channel.send(f'GG {message.author.mention}, you leveled up to level {level} and earned 100 bonus coins!')
 
-            self.cursor.execute('UPDATE users SET xp = ?, level = ? WHERE user_id = ?', (xp, level, user_id))
-            self.conn.commit()
+        self.cursor.execute('UPDATE users SET xp = ?, level = ?, balance = ? WHERE user_id = ?', (xp, level, balance, user_id))
+        self.conn.commit()
+
+        # Crucial: allows other bot commands to still work when using on_message
+        await self.bot.process_commands(message)
 
 async def setup(bot):
     await bot.add_cog(LevelingCog(bot))
