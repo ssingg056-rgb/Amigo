@@ -37,7 +37,10 @@ class LevelingCog(commands.Cog):
 
         if result is None:
             xp, level, balance = 10, 1, 50
-            self.cursor.execute('INSERT INTO users (user_id, xp, level, balance) VALUES (?, ?, ?, ?)', (user_id, xp, level, balance))
+            self.cursor.execute(
+                'INSERT INTO users (user_id, xp, level, balance) VALUES (?, ?, ?, ?)',
+                (user_id, xp, level, balance)
+            )
         else:
             xp, level, balance = result
 
@@ -51,9 +54,12 @@ class LevelingCog(commands.Cog):
                     balance += 100
                     await message.channel.send(f'GG {message.author.mention}, you leveled up to level {level} and earned 100 bonus coins!')
 
-        self.cursor.execute('UPDATE users SET xp = ?, level = ?, balance = ? WHERE user_id = ?', (xp, level, balance, user_id))
-        self.conn.commit()
+            self.cursor.execute(
+                'UPDATE users SET xp = ?, level = ?, balance = ? WHERE user_id = ?',
+                (xp, level, balance, user_id)
+            )
 
+        self.conn.commit()
         await self.bot.process_commands(message)
 
 async def setup(bot):
