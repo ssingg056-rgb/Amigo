@@ -1,4 +1,5 @@
 import os
+print("Files in current directory:", os.listdir("."))
 import asyncio
 import discord
 from discord.ext import commands
