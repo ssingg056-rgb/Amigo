@@ -42,7 +42,7 @@ class HelpCog(commands.Cog):
                 description="Interact with other members in your server.",
                 color=discord.Color.pink()
             )
-            embed.add_field(name="Affection & Social", value="`.hug`, `.kiss`, `.pat`, `.cuddle`, `.poke`, `.tickle`, `.highfive`, `.handshake`, `.fistbump`", inline=False)
+            embed.add_field(name="Affection & Social", value="`.hug`, `.kiss`, `.pat`, `.cuddle`, `.poke`, `.tickle`, `.highfive`, `.handshake`, `.fistbump` `.fuck`", inline=False)
             embed.add_field(name="Actions & Banter", value="`.slap`, `.punch`, `.kick`, `.roast`, `.simp`, `.flirt`, `.kill`", inline=False)
             embed.add_field(name="Expressions", value="`.wave`, `.salute`, `.blush`, `.cry`, `.dance`, `.sleep`, `.shrug`, `.facepalm`", inline=False)
             return await ctx.send(embed=embed)
