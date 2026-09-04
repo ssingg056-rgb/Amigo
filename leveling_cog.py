@@ -1,75 +1,54 @@
-import os
-import psycopg2
+import discord
 from discord.ext import commands
+import sqlite3
 
 class LevelingCog(commands.Cog):
     def __init__(self, bot):
         self.bot = bot
         self.init_db()
 
-    def get_connection(self):
-        # This fetches the DATABASE_URL key you set up in Render
-        return psycopg2.connect(os.getenv("DATABASE_URL"))
-
     def init_db(self):
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        # Creates the leveling table if it doesn't already exist
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS leveling (
-                user_id BIGINT PRIMARY KEY,
-                xp INTEGER DEFAULT 0,
-                level INTEGER DEFAULT 1
+        self.conn = sqlite3.connect('leveling.db')
+        self.cursor = self.conn.cursor()
+        self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY,
+                xp INTEGER,
+                level INTEGER
             )
-        """)
-        conn.commit()
-        cursor.close()
-        conn.close()
+        ''')
+        self.conn.commit()
 
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot:
             return
 
+        MAX_LEVEL = 100  # Set your maximum level cap here
+
         user_id = message.author.id
-        
-        conn = self.get_connection()
-        cursor = conn.cursor()
-
-        # Fetch user's current data
-        cursor.execute("SELECT xp, level FROM leveling WHERE user_id = %s", (user_id,))
-        result = cursor.fetchone()
-
-        MAX_LEVEL = 100  # Sets a cap for the leveling system
+        self.cursor.execute('SELECT xp, level FROM users WHERE user_id = ?', (user_id,))
+        result = self.cursor.fetchone()
 
         if result is None:
-            # Insert user if they don't exist yet
-            cursor.execute("INSERT INTO leveling (user_id, xp, level) VALUES (%s, %s, %s)", (user_id, 15, 1))
-            conn.commit()
+            self.cursor.execute('INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)', (user_id, 10, 1))
+            self.conn.commit()
         else:
             xp, level = result
-            
-            # Check if the user has already reached the maximum level cap
+
+            # Stop giving XP if the user has reached the cap
             if level >= MAX_LEVEL:
-                cursor.close()
-                conn.close()
                 return
 
-            xp += 15  # Add XP per message
-            needed_xp = level * 100  # Formula for leveling up
-
-            if xp >= needed_xp:
+            xp += 10
+            
+            if xp >= 100 * level:
                 level += 1
                 xp = 0
-                # Optional: Send a level-up notification to the channel
-                # await message.channel.send(f"Congrats {message.author.mention}, you leveled up to level {level}!")
+                await message.channel.send(f'GG {message.author.mention}, you leveled up to level {level}!')
 
-            # Update database with new stats
-            cursor.execute("UPDATE leveling SET xp = %s, level = %s WHERE user_id = %s", (xp, level, user_id))
-            conn.commit()
-
-        cursor.close()
-        conn.close()
+            self.cursor.execute('UPDATE users SET xp = ?, level = ? WHERE user_id = ?', (xp, level, user_id))
+            self.conn.commit()
 
 async def setup(bot):
     await bot.add_cog(LevelingCog(bot))
