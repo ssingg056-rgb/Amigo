@@ -8,8 +8,16 @@ class LevelingCog(commands.Cog):
         self.init_db()
 
     def init_db(self):
-        self.conn = sqlite3.connect("economy.db") # Shares the database with your economy cog
+        self.conn = sqlite3.connect("economy.db")
         self.cursor = self.conn.cursor()
+        # Ensure users table exists just in case
+        self.cursor.execute("""
+            CREATE TABLE IF NOT EXISTS users (
+                user_id INTEGER PRIMARY KEY,
+                balance INTEGER DEFAULT 500,
+                bank INTEGER DEFAULT 0
+            )
+        """)
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS leveling (
                 user_id INTEGER PRIMARY KEY,
@@ -19,6 +27,13 @@ class LevelingCog(commands.Cog):
         """)
         self.conn.commit()
 
+    def get_or_create_user(self, user_id):
+        self.cursor.execute("SELECT balance, bank FROM users WHERE user_id = ?", (user_id,))
+        row = self.cursor.fetchone()
+        if not row:
+            self.cursor.execute("INSERT INTO users (user_id, balance, bank) VALUES (?, 500, 0)", (user_id,))
+            self.conn.commit()
+
     @commands.Cog.listener()
     async def on_message(self, message):
         if message.author.bot or not message.guild:
@@ -26,7 +41,9 @@ class LevelingCog(commands.Cog):
 
         user_id = message.author.id
         
-        # Fetch or initialize user XP stats
+        # Ensure user exists in both tables
+        self.get_or_create_user(user_id)
+        
         self.cursor.execute("SELECT xp, level FROM leveling WHERE user_id = ?", (user_id,))
         row = self.cursor.fetchone()
         
@@ -36,18 +53,15 @@ class LevelingCog(commands.Cog):
             return
 
         xp, level = row
-        gained_xp = 15  # Fixed XP per message (or randomize if you prefer)
+        gained_xp = 15
         new_xp = xp + gained_xp
-        
-        # Calculate level threshold (e.g., Level * 100 XP required to level up)
         next_level_xp = level * 100
 
         if new_xp >= next_level_xp:
             new_level = level + 1
-            # Level-up cash bonus that scales higher the more active they are!
             cash_reward = new_level * 500 
             
-            # Update leveling table and bonus cash in the users table
+            # Update leveling and safely add cash to the users table
             self.cursor.execute("UPDATE leveling SET xp = ?, level = ? WHERE user_id = ?", (new_xp - next_level_xp, new_level, user_id))
             self.cursor.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (cash_reward, user_id))
             self.conn.commit()
@@ -63,12 +77,9 @@ class LevelingCog(commands.Cog):
         self.cursor.execute("SELECT xp, level FROM leveling WHERE user_id = ?", (target.id,))
         row = self.cursor.fetchone()
         
-        if not row:
-            lvl, xp = 1, 0
-        else:
-            xp, lvl = row
-
+        xp, lvl = row if row else (0, 1)
         next_goal = lvl * 100
+        
         embed = discord.Embed(title=f"📊 {target.display_name}'s Rank & Level", color=discord.Color.blue())
         embed.add_field(name="Level", value=str(lvl), inline=True)
         embed.add_field(name="Current XP", value=f"{xp} / {next_goal}", inline=True)
