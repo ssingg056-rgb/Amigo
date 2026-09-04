@@ -41,6 +41,7 @@ async def main():
         await bot.load_extension("economy_cog")
         await bot.load_extension("roleplay_cog")
         await bot.load_extension("help_cog")
+        await bot.load_extension("leveling_cog")
         await bot.start(TOKEN)
 
 if __name__ == "__main__":
