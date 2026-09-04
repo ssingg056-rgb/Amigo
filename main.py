@@ -13,7 +13,7 @@ intents = discord.Intents.default()
 intents.members = True  # Required to detect when members join
 intents.message_content = True  # Required to read commands
 
-bot = commands.Bot(command_prefix=".", intents=intents)
+bot = commands.Bot(command_prefix=".", intents=intents, help_command=None)
 
 # Flask server to bind to Render's port
 app = Flask('')
