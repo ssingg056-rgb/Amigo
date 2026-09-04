@@ -1,4 +1,5 @@
 import os
+import asyncio
 import discord
 from discord.ext import commands
 from dotenv import load_dotenv
@@ -10,7 +11,7 @@ TOKEN = os.getenv("DISCORD_TOKEN")
 
 intents = discord.Intents.default()
 intents.members = True  # Required to detect when members join
-intents.message_content = True  # Required to read commands like .quo
+intents.message_content = True  # Required to read commands
 
 bot = commands.Bot(command_prefix=".", intents=intents)
 
@@ -32,10 +33,15 @@ def keep_alive():
 @bot.event
 async def on_ready():
     print(f"Logged in as {bot.user.name}!")
-    await bot.load_extension("welcome_cog")
-    await bot.load_extension("quote_cog")
-    await bot.load_extension("economy_cog")
+
+async def main():
+    async with bot:
+        await bot.load_extension("welcome_cog")
+        await bot.load_extension("quote_cog")
+        await bot.load_extension("economy_cog")
+        await bot.load_extension("roleplay_cog")
+        await bot.start(TOKEN)
 
 if __name__ == "__main__":
     keep_alive()
-    bot.run(TOKEN)
+    asyncio.run(main())
