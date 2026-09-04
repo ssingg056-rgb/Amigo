@@ -45,7 +45,7 @@ RESOURCE_VALUES = {
 }
 
 ALL_SHOP_ITEMS = HUNT_ITEMS + MINE_ITEMS + FISH_ITEMS
-OWNER_IDS = [123456789012345678]  # Replace with your actual Discord User ID
+OWNER_IDS = [1521196096465010719]  # Replace with your actual Discord User ID
 
 def is_bot_owner():
     def predicate(ctx):
