@@ -74,7 +74,7 @@ class FullEconomyCog(commands.Cog):
             description="Explore, gather resources, buy gear, and manage your wealth!",
             color=discord.Color.blue()
         )
-        embed.add_field(name="💰 Core Financials", value="`.bal` - Check wallet & bank\n`.work` - Earn initial cash\n`.deposit <amount>` - Secure cash in bank\n`.withdraw <amount>` - Pull cash out", inline=False)
+        embed.add_field(name="💰 Core Financials", value="`.bal` - Check wallet & bank\n`.work` - Earn initial cash\n`.deposit <amount>` - Secure cash in bank\n`.withdraw <amount>` - Pull cash out\n`.leaderboard` - View richest users", inline=False)
         embed.add_field(name="🏕️ Gathering & Adventure", value="`.hunt` - Hunt wildlife using your best gear\n`.mine` - Mine ores using your best pickaxe\n`.fish` - Catch fish using your best rod", inline=False)
         embed.add_field(name="🛒 Shop & Inventory", value="`.shop` - View all escalating upgrade gear\n`.buy <item name>` - Purchase items\n`.inventory` - Check your owned equipment", inline=False)
         embed.add_field(name="🛠️ Owner / Admin Commands", value="`.normalize` - Reset all data\n`.givemoney <member> <amount>` - Add money to user\n`.takemoney <member> <amount>` - Remove money from user\n`.setbalance <member> <amount>` - Set exact balance", inline=False)
@@ -87,6 +87,23 @@ class FullEconomyCog(commands.Cog):
         embed = discord.Embed(title=f"🪙 {target.display_name}'s Balance", color=discord.Color.gold())
         embed.add_field(name="Wallet", value=f"${bal:,}", inline=True)
         embed.add_field(name="Bank", value=f"${bank:,}", inline=True)
+        await ctx.send(embed=embed)
+
+    @commands.command(name="leaderboard", aliases=["lb", "top"])
+    async def leaderboard(self, ctx):
+        self.cursor.execute("SELECT user_id, (balance + bank) as total FROM users ORDER BY total DESC LIMIT 10")
+        rows = self.cursor.fetchall()
+
+        embed = discord.Embed(title="🏆 Wealth Leaderboard - Top 10", color=discord.Color.gold())
+        if not rows:
+            embed.description = "No users found in the economy yet."
+        else:
+            desc = []
+            for idx, (uid, total) in enumerate(rows, start=1):
+                member = ctx.guild.get_member(uid)
+                name = member.display_name if member else f"User ID: {uid}"
+                desc.append(f"**{idx}.** {name} — **${total:,}**")
+            embed.description = "\n".join(desc)
         await ctx.send(embed=embed)
 
     @commands.command(name="work")
@@ -224,8 +241,6 @@ class FullEconomyCog(commands.Cog):
         self.conn.commit()
         await ctx.send(f"🎣 Using your **{best_gear['name']}**, you reeled in a massive catch worth **${reward:,}**!")
 
-    # --- FULL OWNER ADMIN COMMAND SUITE ---
-
     @commands.command(name="normalize")
     @commands.is_owner()
     async def normalize(self, ctx):
@@ -239,7 +254,7 @@ class FullEconomyCog(commands.Cog):
     async def givemoney(self, ctx, member: discord.Member, amount: int):
         if amount <= 0:
             return await ctx.send("❌ Amount must be greater than zero.")
-        self.get_user(member.id) # Ensure user exists
+        self.get_user(member.id)
         self.cursor.execute("UPDATE users SET balance = balance + ? WHERE user_id = ?", (amount, member.id))
         self.conn.commit()
         await ctx.send(f"✅ Added **${amount:,}** to {member.mention}'s wallet.")
