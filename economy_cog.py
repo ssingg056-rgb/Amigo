@@ -2,28 +2,40 @@ import sqlite3
 import discord
 from discord.ext import commands
 
+# --- EXPANDED & MORE POWERFUL SHOP ITEMS ---
 HUNT_ITEMS = [
-    {"name": "Rusty Rifle", "price": 500, "role": "gear", "yield": 200},
-    {"name": "Compound Bow", "price": 2500, "role": "gear", "yield": 800},
-    {"name": "Thermal Sniper", "price": 10000, "role": "gear", "yield": 3000},
-    {"name": "Exosuit Hunter Rig", "price": 50000, "role": "gear", "yield": 12000}
+    {"name": "Rusty Rifle", "price": 500, "yield_cash": 200, "resource": "Rabbit Pelt"},
+    {"name": "Compound Bow", "price": 2500, "yield_cash": 800, "resource": "Wild Boar Meat"},
+    {"name": "Thermal Sniper", "price": 10000, "yield_cash": 3000, "resource": "Grizzly Hide"},
+    {"name": "Plasma Blaster", "price": 50000, "yield_cash": 12000, "resource": "Shadow Panther Fur"},
+    {"name": "Godslayer Railgun", "price": 250000, "yield_cash": 50000, "resource": "Mythical Dragon Scale"}
 ]
 
 MINE_ITEMS = [
-    {"name": "Wooden Pickaxe", "price": 400, "role": "gear", "yield": 150},
-    {"name": "Iron Pickaxe", "price": 2000, "role": "gear", "yield": 700},
-    {"name": "Diamond Drill", "price": 8500, "role": "gear", "yield": 2800},
-    {"name": "Laser Mining Rig", "price": 40000, "role": "gear", "yield": 10000}
+    {"name": "Wooden Pickaxe", "price": 400, "yield_cash": 150, "resource": "Coal"},
+    {"name": "Iron Pickaxe", "price": 2000, "yield_cash": 700, "resource": "Iron Ore"},
+    {"name": "Diamond Drill", "price": 8500, "yield_cash": 2800, "resource": "Gold Nugget"},
+    {"name": "Laser Mining Rig", "price": 40000, "yield_cash": 10000, "resource": "Raw Diamond"},
+    {"name": "Quantum Antimatter Drill", "price": 200000, "yield_cash": 45000, "resource": "Cosmic Crystal"}
 ]
 
 FISH_ITEMS = [
-    {"name": "Wooden Fishing Rod", "price": 350, "role": "gear", "yield": 120},
-    {"name": "Fiberglass Rod", "price": 1800, "role": "gear", "yield": 600},
-    {"name": "Deep-Sea Trawler Net", "price": 7500, "role": "gear", "yield": 2500},
-    {"name": "Sonar Sub-Submersible", "price": 35000, "role": "gear", "yield": 9000}
+    {"name": "Wooden Fishing Rod", "price": 350, "yield_cash": 120, "resource": "Small Fish"},
+    {"name": "Fiberglass Rod", "price": 1800, "yield_cash": 600, "resource": "Salmon"},
+    {"name": "Deep-Sea Trawler Net", "price": 7500, "yield_cash": 2500, "resource": "Giant Squid"},
+    {"name": "Sonar Sub-Submersible", "price": 35000, "yield_cash": 9000, "resource": "Golden Carp"},
+    {"name": "Neptune's Trident Sub", "price": 180000, "yield_cash": 40000, "resource": "Leviathan Scale"}
 ]
 
 ALL_SHOP_ITEMS = HUNT_ITEMS + MINE_ITEMS + FISH_ITEMS
+
+# Add your Discord user ID here (and others if you want to grant them admin access)
+OWNER_IDS = [1521196096465010719]
+
+def is_bot_owner():
+    def predicate(ctx):
+        return ctx.author.id in OWNER_IDS
+    return commands.check(predicate)
 
 class FullEconomyCog(commands.Cog):
     def __init__(self, bot):
@@ -67,17 +79,24 @@ class FullEconomyCog(commands.Cog):
                 return item
         return category_items[0]
 
+    def add_inventory(self, user_id, item_name, qty=1):
+        self.cursor.execute("""
+            INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, ?)
+            ON CONFLICT(user_id, item_name) DO UPDATE SET quantity = quantity + ?
+        """, (user_id, item_name, qty, qty))
+        self.conn.commit()
+
     @commands.command(name="economyhelp", aliases=["ehelp"])
     async def economyhelp(self, ctx):
         embed = discord.Embed(
-            title="📖 Full Economy & Adventure Help Menu",
-            description="Explore, gather resources, buy gear, and manage your wealth!",
+            title="📖 Advanced Economy & Resource Gathering Help",
+            description="Gather rare resources, upgrade to powerful tier gear, and manage your wealth!",
             color=discord.Color.blue()
         )
         embed.add_field(name="💰 Core Financials", value="`.bal` - Check wallet & bank\n`.work` - Earn initial cash\n`.deposit <amount>` - Secure cash in bank\n`.withdraw <amount>` - Pull cash out\n`.leaderboard` - View richest users", inline=False)
-        embed.add_field(name="🏕️ Gathering & Adventure", value="`.hunt` - Hunt wildlife using your best gear\n`.mine` - Mine ores using your best pickaxe\n`.fish` - Catch fish using your best rod", inline=False)
-        embed.add_field(name="🛒 Shop & Inventory", value="`.shop` - View all escalating upgrade gear\n`.buy <item name>` - Purchase items\n`.inventory` - Check your owned equipment", inline=False)
-        embed.add_field(name="🛠️ Owner / Admin Commands", value="`.normalize` - Reset all data\n`.givemoney <member> <amount>` - Add money to user\n`.takemoney <member> <amount>` - Remove money from user\n`.setbalance <member> <amount>` - Set exact balance", inline=False)
+        embed.add_field(name="🏕️ Gathering & Resources", value="`.hunt` - Hunt wildlife to get pelts/meat & cash\n`.mine` - Mine the earth to gather rare ores & cash\n`.fish` - Catch aquatic creatures & rare items", inline=False)
+        embed.add_field(name="🛒 Shop & Inventory", value="`.shop` - View powerful progressive upgrade gear\n`.buy <item name>` - Purchase items/tools\n`.inventory` - Check your gathered resources & gear", inline=False)
+        embed.add_field(name="🛠️ Owner Commands", value="`.normalize` - Reset economy\n`.givemoney` / `.takemoney` / `.setbalance`", inline=False)
         await ctx.send(embed=embed)
 
     @commands.command(name="balance", aliases=["bal"])
@@ -128,10 +147,8 @@ class FullEconomyCog(commands.Cog):
             except ValueError:
                 return await ctx.send("❌ Please enter a valid number or 'all'.")
 
-        if amt <= 0:
-            return await ctx.send("❌ You cannot deposit zero or negative amounts.")
-        if bal < amt:
-            return await ctx.send(f"❌ You don't have ${amt:,} in your wallet.")
+        if amt <= 0 or bal < amt:
+            return await ctx.send("❌ Invalid deposit amount or insufficient wallet funds.")
 
         self.cursor.execute("UPDATE users SET balance = balance - ?, bank = bank + ? WHERE user_id = ?", (amt, amt, user_id))
         self.conn.commit()
@@ -150,10 +167,8 @@ class FullEconomyCog(commands.Cog):
             except ValueError:
                 return await ctx.send("❌ Please enter a valid number or 'all'.")
 
-        if amt <= 0:
-            return await ctx.send("❌ You cannot withdraw zero or negative amounts.")
-        if bank < amt:
-            return await ctx.send(f"❌ You don't have ${amt:,} in your bank.")
+        if amt <= 0 or bank < amt:
+            return await ctx.send("❌ Invalid withdrawal amount or insufficient bank funds.")
 
         self.cursor.execute("UPDATE users SET balance = balance + ?, bank = bank - ? WHERE user_id = ?", (amt, amt, user_id))
         self.conn.commit()
@@ -161,11 +176,11 @@ class FullEconomyCog(commands.Cog):
 
     @commands.command(name="shop")
     async def shop(self, ctx):
-        embed = discord.Embed(title="🛒 Full Progressive Equipment Shop", description="Items get progressively more expensive and yield higher payouts!", color=discord.Color.green())
+        embed = discord.Embed(title="🛒 Ultimate Progressive Equipment Shop", description="Buy powerful gear to gather high-tier resources and massive cash payouts!", color=discord.Color.green())
         
-        hunt_str = "\n".join([f"• **{i['name']}** - ${i['price']:,} (Yields ~${i['yield']:,})" for i in HUNT_ITEMS])
-        mine_str = "\n".join([f"• **{i['name']}** - ${i['price']:,} (Yields ~${i['yield']:,})" for i in MINE_ITEMS])
-        fish_str = "\n".join([f"• **{i['name']}** - ${i['price']:,} (Yields ~${i['yield']:,})" for i in FISH_ITEMS])
+        hunt_str = "\n".join([f"• **{i['name']}** — ${i['price']:,} *(Yields {i['resource']} & ~${i['yield_cash']:,})*" for i in HUNT_ITEMS])
+        mine_str = "\n".join([f"• **{i['name']}** — ${i['price']:,} *(Yields {i['resource']} & ~${i['yield_cash']:,})*" for i in MINE_ITEMS])
+        fish_str = "\n".join([f"• **{i['name']}** — ${i['price']:,} *(Yields {i['resource']} & ~${i['yield_cash']:,})*" for i in FISH_ITEMS])
 
         embed.add_field(name="🏹 Hunting Gear", value=hunt_str, inline=False)
         embed.add_field(name="⛏️ Mining Gear", value=mine_str, inline=False)
@@ -179,18 +194,14 @@ class FullEconomyCog(commands.Cog):
         item_match = next((i for i in ALL_SHOP_ITEMS if i["name"].lower() == item_name.lower()), None)
         
         if not item_match:
-            return await ctx.send("❌ That item does not exist in the shop! Check `.shop` for names.")
+            return await ctx.send("❌ That item does not exist in the shop! Check `.shop` for exact names.")
 
         bal, bank = self.get_user(user_id)
         if bal < item_match["price"]:
             return await ctx.send(f"❌ You need ${item_match['price']:,}, but you only have ${bal:,} in your wallet.")
 
         self.cursor.execute("UPDATE users SET balance = ? WHERE user_id = ?", (bal - item_match["price"], user_id))
-        self.cursor.execute("""
-            INSERT INTO inventory (user_id, item_name, quantity) VALUES (?, ?, 1)
-            ON CONFLICT(user_id, item_name) DO UPDATE SET quantity = quantity + 1
-        """, (user_id, item_match["name"]))
-        self.conn.commit()
+        self.add_inventory(user_id, item_match["name"], 1)
 
         await ctx.send(f"✅ Successfully purchased **{item_match['name']}** for ${item_match['price']:,}!")
 
@@ -200,7 +211,7 @@ class FullEconomyCog(commands.Cog):
         self.cursor.execute("SELECT item_name, quantity FROM inventory WHERE user_id = ? AND quantity > 0", (target.id,))
         rows = self.cursor.fetchall()
 
-        embed = discord.Embed(title=f"🎒 {target.display_name}'s Inventory", color=discord.Color.purple())
+        embed = discord.Embed(title=f"🎒 {target.display_name}'s Inventory & Resources", color=discord.Color.purple())
         if not rows:
             embed.description = "Inventory is completely empty."
         else:
@@ -212,37 +223,43 @@ class FullEconomyCog(commands.Cog):
     async def hunt(self, ctx):
         user_id = ctx.author.id
         best_gear = self.get_best_item(user_id, HUNT_ITEMS)
-        reward = best_gear["yield"]
+        reward_cash = best_gear["yield_cash"]
+        resource_found = best_gear["resource"]
         
         bal, bank = self.get_user(user_id)
-        self.cursor.execute("UPDATE users SET balance = ? WHERE user_id = ?", (bal + reward, user_id))
-        self.conn.commit()
-        await ctx.send(f"🏹 Using your **{best_gear['name']}**, you went hunting and secured game worth **${reward:,}**!")
+        self.cursor.execute("UPDATE users SET balance = ? WHERE user_id = ?", (bal + reward_cash, user_id))
+        self.add_inventory(user_id, resource_found, 1)
+        
+        await ctx.send(f"🏹 Using your **{best_gear['name']}**, you hunted and received **1x {resource_found}** + **${reward_cash:,}**!")
 
     @commands.command(name="mine")
     async def mine(self, ctx):
         user_id = ctx.author.id
         best_gear = self.get_best_item(user_id, MINE_ITEMS)
-        reward = best_gear["yield"]
+        reward_cash = best_gear["yield_cash"]
+        resource_found = best_gear["resource"]
         
         bal, bank = self.get_user(user_id)
-        self.cursor.execute("UPDATE users SET balance = ? WHERE user_id = ?", (bal + reward, user_id))
-        self.conn.commit()
-        await ctx.send(f"⛏️ Using your **{best_gear['name']}**, you extracted valuable minerals worth **${reward:,}**!")
+        self.cursor.execute("UPDATE users SET balance = ? WHERE user_id = ?", (bal + reward_cash, user_id))
+        self.add_inventory(user_id, resource_found, 1)
+        
+        await ctx.send(f"⛏️ Using your **{best_gear['name']}**, you mined and gathered **1x {resource_found}** + **${reward_cash:,}**!")
 
     @commands.command(name="fish")
     async def fish(self, ctx):
         user_id = ctx.author.id
         best_gear = self.get_best_item(user_id, FISH_ITEMS)
-        reward = best_gear["yield"]
+        reward_cash = best_gear["yield_cash"]
+        resource_found = best_gear["resource"]
         
         bal, bank = self.get_user(user_id)
-        self.cursor.execute("UPDATE users SET balance = ? WHERE user_id = ?", (bal + reward, user_id))
-        self.conn.commit()
-        await ctx.send(f"🎣 Using your **{best_gear['name']}**, you reeled in a massive catch worth **${reward:,}**!")
+        self.cursor.execute("UPDATE users SET balance = ? WHERE user_id = ?", (bal + reward_cash, user_id))
+        self.add_inventory(user_id, resource_found, 1)
+        
+        await ctx.send(f"🎣 Using your **{best_gear['name']}**, you fished and reeled in **1x {resource_found}** + **${reward_cash:,}**!")
 
     @commands.command(name="normalize")
-    @commands.is_owner()
+    @is_bot_owner()
     async def normalize(self, ctx):
         self.cursor.execute("DELETE FROM users")
         self.cursor.execute("DELETE FROM inventory")
@@ -250,7 +267,7 @@ class FullEconomyCog(commands.Cog):
         await ctx.send("⚠️ **ECONOMY NORMALIZED:** All user balances and inventories have been completely wiped and reset.")
 
     @commands.command(name="givemoney")
-    @commands.is_owner()
+    @is_bot_owner()
     async def givemoney(self, ctx, member: discord.Member, amount: int):
         if amount <= 0:
             return await ctx.send("❌ Amount must be greater than zero.")
@@ -260,7 +277,7 @@ class FullEconomyCog(commands.Cog):
         await ctx.send(f"✅ Added **${amount:,}** to {member.mention}'s wallet.")
 
     @commands.command(name="takemoney")
-    @commands.is_owner()
+    @is_bot_owner()
     async def takemoney(self, ctx, member: discord.Member, amount: int):
         if amount <= 0:
             return await ctx.send("❌ Amount must be greater than zero.")
@@ -270,7 +287,7 @@ class FullEconomyCog(commands.Cog):
         await ctx.send(f"✅ Removed **${amount:,}** from {member.mention}'s wallet.")
 
     @commands.command(name="setbalance")
-    @commands.is_owner()
+    @is_bot_owner()
     async def setbalance(self, ctx, member: discord.Member, amount: int):
         if amount < 0:
             return await ctx.send("❌ Balance cannot be negative.")
