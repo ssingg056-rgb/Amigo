@@ -21,6 +21,11 @@ class RoleplayCog(commands.Cog):
     async def hug(self, ctx, member: discord.Member = None):
         await self.send_rp(ctx, member, "gives a warm hug to", discord.Color.pink())
 
+    @commands.command(name="fuck")
+    async def fuck(self, ctx, member: discord.Member = None):
+        await self.send_rp(ctx, member, "fucks", discord.Color.pink())
+        
+
     @commands.command(name="kiss")
     async def kiss(self, ctx, member: discord.Member = None):
         await self.send_rp(ctx, member, "gives a sweet kiss to", discord.Color.magenta())
