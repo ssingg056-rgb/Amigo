@@ -18,6 +18,10 @@ class LevelingCog(commands.Cog):
                 balance INTEGER DEFAULT 0
             )
         ''')
+        try:
+            self.cursor.execute('ALTER TABLE users ADD COLUMN balance INTEGER DEFAULT 0')
+        except sqlite3.OperationalError:
+            pass
         self.conn.commit()
 
     @commands.Cog.listener()
@@ -25,14 +29,13 @@ class LevelingCog(commands.Cog):
         if message.author.bot:
             return
 
-        MAX_LEVEL = 100 
+        MAX_LEVEL = 100
         user_id = message.author.id
 
         self.cursor.execute('SELECT xp, level, balance FROM users WHERE user_id = ?', (user_id,))
         result = self.cursor.fetchone()
 
         if result is None:
-            # First time user: start with 10 xp, level 1, and 50 starting coins/money
             xp, level, balance = 10, 1, 50
             self.cursor.execute('INSERT INTO users (user_id, xp, level, balance) VALUES (?, ?, ?, ?)', (user_id, xp, level, balance))
         else:
@@ -40,19 +43,17 @@ class LevelingCog(commands.Cog):
 
             if level < MAX_LEVEL:
                 xp += 10
-                balance += 5  # Gives 5 coins every time they chat
+                balance += 5
 
-                # Level up check
                 if xp >= 100 * level:
                     level += 1
                     xp = 0
-                    balance += 100  # Bonus coins on level up!
+                    balance += 100
                     await message.channel.send(f'GG {message.author.mention}, you leveled up to level {level} and earned 100 bonus coins!')
 
         self.cursor.execute('UPDATE users SET xp = ?, level = ?, balance = ? WHERE user_id = ?', (xp, level, balance, user_id))
         self.conn.commit()
 
-        # Crucial: allows other bot commands to still work when using on_message
         await self.bot.process_commands(message)
 
 async def setup(bot):
