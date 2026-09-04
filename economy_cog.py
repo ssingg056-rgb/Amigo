@@ -34,7 +34,6 @@ FISH_ITEMS = [
     {"name": "Omniversal Time-Tide Harpoon", "price": 7500000, "yield_cash": 800000, "resource": "Eternity Leviathan Tear", "tier": "Omniversal"}
 ]
 
-# Sell value dictionary for resources gathered
 RESOURCE_VALUES = {
     "Rabbit Pelt": 50, "Wild Boar Meat": 180, "Grizzly Hide": 700, "Shadow Panther Fur": 2800, 
     "Mythical Dragon Scale": 12000, "Celestial Essence": 60000, "Omni-God Core": 300000,
@@ -45,7 +44,7 @@ RESOURCE_VALUES = {
 }
 
 ALL_SHOP_ITEMS = HUNT_ITEMS + MINE_ITEMS + FISH_ITEMS
-OWNER_IDS = [1521196096465010719]  # Replace with your actual Discord User ID
+OWNER_IDS = [1521196096465010719]
 
 def is_bot_owner():
     def predicate(ctx):
@@ -58,15 +57,24 @@ class FullEconomyCog(commands.Cog):
         self.init_db()
 
     def init_db(self):
-        self.conn = sqlite3.connect("economy.db")
+        # Now shares the exact same database as leveling_cog.py[cite: 1]
+        self.conn = sqlite3.connect("leveling.db")
         self.cursor = self.conn.cursor()
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
+                xp INTEGER DEFAULT 0,
+                level INTEGER DEFAULT 1,
                 balance INTEGER DEFAULT 500,
                 bank INTEGER DEFAULT 0
             )
         """)
+        # Safely ensure the bank column exists if the table was created earlier without it
+        try:
+            self.cursor.execute("ALTER TABLE users ADD COLUMN bank INTEGER DEFAULT 0")
+        except sqlite3.OperationalError:
+            pass
+            
         self.cursor.execute("""
             CREATE TABLE IF NOT EXISTS inventory (
                 user_id INTEGER,
@@ -81,10 +89,17 @@ class FullEconomyCog(commands.Cog):
         self.cursor.execute("SELECT balance, bank FROM users WHERE user_id = ?", (user_id,))
         row = self.cursor.fetchone()
         if not row:
-            self.cursor.execute("INSERT INTO users (user_id, balance, bank) VALUES (?, 500, 0)", (user_id,))
+            self.cursor.execute("""
+                INSERT INTO users (user_id, xp, level, balance, bank) 
+                VALUES (?, 0, 1, 500, 0)
+                ON CONFLICT(user_id) DO UPDATE SET balance = COALESCE(balance, 500)
+            """, (user_id,))
             self.conn.commit()
             return [500, 0]
-        return row
+        
+        bal = row[0] if row[0] is not None else 500
+        bank = row[1] if row[1] is not None else 0
+        return [bal, bank]
 
     def get_best_item(self, user_id, category_items):
         for item in reversed(category_items):
@@ -129,7 +144,7 @@ class FullEconomyCog(commands.Cog):
 
     @commands.command(name="leaderboard", aliases=["lb", "top"])
     async def leaderboard(self, ctx):
-        self.cursor.execute("SELECT user_id, (balance + bank) as total FROM users ORDER BY total DESC LIMIT 10")
+        self.cursor.execute("SELECT user_id, (COALESCE(balance, 0) + COALESCE(bank, 0)) as total FROM users ORDER BY total DESC LIMIT 10")
         rows = self.cursor.fetchall()
         embed = discord.Embed(title="🏆 Wealth Leaderboard - Top 10", color=discord.Color.gold())
         if not rows:
@@ -202,14 +217,13 @@ class FullEconomyCog(commands.Cog):
         if amount <= 0:
             return await ctx.send("❌ Amount must be greater than zero.")
         
-        # Match inventory case-insensitively
         self.cursor.execute("SELECT item_name, quantity FROM inventory WHERE user_id = ? AND LOWER(item_name) = ?", (user_id, item_name.lower()))
         row = self.cursor.fetchone()
         if not row or row[1] < amount:
             return await ctx.send("❌ You don't have enough of that item in your inventory to sell.")
         
         actual_name = row[0]
-        unit_price = RESOURCE_VALUES.get(actual_name, 20)  # Default fallback price
+        unit_price = RESOURCE_VALUES.get(actual_name, 20)
         total_payout = unit_price * amount
 
         self.cursor.execute("UPDATE inventory SET quantity = quantity - ? WHERE user_id = ? AND item_name = ?", (amount, user_id, actual_name))
