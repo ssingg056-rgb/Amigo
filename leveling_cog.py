@@ -14,14 +14,9 @@ class LevelingCog(commands.Cog):
             CREATE TABLE IF NOT EXISTS users (
                 user_id INTEGER PRIMARY KEY,
                 xp INTEGER DEFAULT 0,
-                level INTEGER DEFAULT 1,
-                balance INTEGER DEFAULT 0
+                level INTEGER DEFAULT 1
             )
         ''')
-        try:
-            self.cursor.execute('ALTER TABLE users ADD COLUMN balance INTEGER DEFAULT 0')
-        except sqlite3.OperationalError:
-            pass
         self.conn.commit()
 
     @commands.Cog.listener()
@@ -32,31 +27,29 @@ class LevelingCog(commands.Cog):
         MAX_LEVEL = 100
         user_id = message.author.id
 
-        self.cursor.execute('SELECT xp, level, balance FROM users WHERE user_id = ?', (user_id,))
+        self.cursor.execute('SELECT xp, level FROM users WHERE user_id = ?', (user_id,))
         result = self.cursor.fetchone()
 
         if result is None:
-            xp, level, balance = 10, 1, 50
+            xp, level = 10, 1
             self.cursor.execute(
-                'INSERT INTO users (user_id, xp, level, balance) VALUES (?, ?, ?, ?)',
-                (user_id, xp, level, balance)
+                'INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)',
+                (user_id, xp, level)
             )
         else:
-            xp, level, balance = result
+            xp, level = result
 
             if level < MAX_LEVEL:
                 xp += 10
-                balance += 5
 
                 if xp >= 100 * level:
                     level += 1
                     xp = 0
-                    balance += 100
-                    await message.channel.send(f'GG {message.author.mention}, you leveled up to level {level} and earned 100 bonus coins!')
+                    await message.channel.send(f'GG {message.author.mention}, you leveled up to level {level}!')
 
             self.cursor.execute(
-                'UPDATE users SET xp = ?, level = ?, balance = ? WHERE user_id = ?',
-                (xp, level, balance, user_id)
+                'UPDATE users SET xp = ?, level = ? WHERE user_id = ?',
+                (xp, level, user_id)
             )
 
         self.conn.commit()

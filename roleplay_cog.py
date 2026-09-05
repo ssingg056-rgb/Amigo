@@ -42,6 +42,10 @@ class RoleplayCog(commands.Cog):
     async def holdhands(self, ctx, member: discord.Member = None):
         await self.send_rp(ctx, member, "holds hands with", discord.Color.blue())
 
+    @commands.command(name="holdhands", aliases=["Fuck"])
+    async def Fuck(self, ctx, member: discord.Member = None):
+        await self.send_rp(ctx, member, "fucks", discord.Color.blue())    
+
     @commands.command(name="poke")
     async def poke(self, ctx, member: discord.Member = None):
         await self.send_rp(ctx, member, "pokes", discord.Color.gold())
