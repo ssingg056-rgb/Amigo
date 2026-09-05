@@ -38,7 +38,6 @@ async def main():
     async with bot:
         await bot.load_extension("welcome_cog")
         await bot.load_extension("quote_cog")
-        await bot.load_extension("economy_cog")
         await bot.load_extension("roleplay_cog")
         await bot.load_extension("help_cog")
         await bot.load_extension("leveling_cog")
